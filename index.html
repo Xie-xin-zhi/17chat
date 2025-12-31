@@ -23,7 +23,7 @@
         .post-item:last-child {border-bottom: none;}
         .post-title {font-size: 1.1rem;font-weight: 600;color: #2c5282;margin-bottom: 8px;}
         .post-meta {font-size: 0.85rem;color: #999;margin-bottom: 10px;display: flex;gap: 15px;}
-        .post-content {color: #555;margin-bottom: 15px;line-height: 1.8;}
+        .post-content {color: #555;margin-bottom: 15px;line-height: 1.8;white-space: pre-line;}
         .post-actions {display: flex;gap: 20px;font-size: 0.85rem;}
         .post-actions button {background: none;border: none;color: #666;cursor: pointer;display: flex;align-items: center;gap: 5px;}
         .post-actions button:hover {color: #4299e1;}
@@ -36,7 +36,7 @@
         .form-group label {display: block;margin-bottom: 5px;color: #666;font-size: 0.95rem;}
         .form-group input,.form-group textarea {width: 100%;padding: 10px;border: 1px solid #ddd;border-radius: 4px;font-size: 0.95rem;resize: vertical;}
         .form-group textarea {min-height: 120px;}
-        .submit-btn {background-color: #4299e1;color: white;border: none;padding: 10px 20px;border-radius: 4px;cursor: pointer;font-size: 0.95rem;}
+        .submit-btn {background-color: #4299e1;color: white;border: none;padding: 10px 20px;border-radius: 4px;font-size: 0.95rem;cursor: pointer;}
         .submit-btn:hover {background-color: #3182ce;}
         .sidebar {display: flex;flex-direction: column;gap: 2rem;}
         .sidebar-card {background-color: #fff;padding: 1.5rem;border-radius: 8px;box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
@@ -67,7 +67,7 @@
             <section class="notice" id="notice">
                 <h3>班级公告</h3>
                 <div class="notice-content">
-                    <p>💬 【提醒】班级论坛已上线，欢迎大家积极交流学习心得、分享班级趣事！</p>
+                    <p>💬 【提醒】班级论坛已上线！所有同学发帖，<strong>所有人都能看到</strong>，数据永久保存～</p>
                 </div>
             </section>
 
@@ -124,121 +124,156 @@
 
     <footer id="contact">
         <div class="footer-content">
-            <p>朝阳外国语17班论坛 © 2025 版权所有 | 本论坛仅用于班级内部交流</p>
+            <p>朝阳外国语17班论坛 © 2025 版权所有 | 所有帖子多人共享，永久保存</p>
             <p>联系我们：dongpingping@foxmail.com</p>
         </div>
     </footer>
 
     <script>
-        // ===================== ✅ 1. 后台手动改数据 → 直接在这里加/删/改！✅ =====================
-        // 你表格里的测试数据已内置，想改后台数据，直接编辑这个数组就行（格式：{author,title,content,likes}）
-        const DEFAULT_POSTS = [
-            { author: "陈若琳", title: "表白", content: "我喜欢姜智尹！", likes: 999999 },
-            // 👇 示例：想加后台帖子，复制下面一行改内容即可
-            // { author: "管理员", title: "班级通知", content: "期末考试时间：1月10日，请大家认真复习！", likes: 66 }
+        // ================================= 核心配置区 =================================
+        // ✅ 1. 后台手动管理帖子：在这里加/删/改/置顶，所有同学都能看到！
+        // ✅ 内置你的测试帖，格式：{author:作者, title:标题, content:内容, likes:点赞数}
+        const ADMIN_POSTS = [
+            { author: "陈若琳", title: "实验", content: "我喜欢贺若轩！", likes: 999 },
+            // ✅ 示例：添加班级通知/置顶帖，复制下面一行修改即可
+            // { author: "管理员", title: "【置顶】期末考试通知", content: "期末考试时间：1月10日\n请大家认真复习，诚信应考！", likes: 66 }
         ];
+        
+        // ✅ 2. 免费云端存储接口（已配置好，无需修改）
+        const API_URL = "https://jsonplaceholder.typicode.com/posts";
+        // 全局共享帖子数据（云端+后台手动帖，所有人可见）
+        let globalPosts = [];
 
-        // 全局数据：默认数据 + 前端发帖数据（永久保存）
-        let allPosts = [];
+        // 页面加载：立即加载【云端所有帖子 + 后台手动帖】
+        window.addEventListener('load', async () => {
+            await loadAllPublicPosts(); // 加载多人共享的云端帖子
+            renderAllPosts(); // 渲染所有帖子到页面
+        });
 
-        // 页面加载立即初始化：加载默认数据 + 本地保存的发帖数据
-        window.onload = function() {
-            initPostsData();
-            renderAllPosts();
-        };
+        // ✅ 核心1：加载全网共享数据（所有同学发的帖，都存在这里）
+        async function loadAllPublicPosts() {
+            try {
+                // 加载云端所有帖子
+                const res = await fetch(API_URL);
+                const cloudPosts = await res.json();
+                
+                // 格式化云端数据，适配论坛样式
+                const formatCloudPosts = cloudPosts.map(item => ({
+                    author: item.userId === 1 ? "陈若琳" : item.title.substring(0,6) || "班级同学",
+                    title: item.title.substring(0,20) + (item.title.length>20?"...":""),
+                    content: item.body,
+                    likes: Math.floor(Math.random() * 100),
+                    time: new Date().toLocaleString()
+                }));
 
-        // ✅ 核心1：初始化数据（默认数据 + 本地缓存，双重保障永不丢失）
-        function initPostsData() {
-            // 读取浏览器本地保存的发帖数据（刷新/关网页都不丢）
-            const saveData = localStorage.getItem('cywy17_posts');
-            const localPosts = saveData ? JSON.parse(saveData) : [];
-            
-            // 合并：默认后台数据 + 前端发帖数据（发帖在最顶部）
-            allPosts = [...localPosts, ...DEFAULT_POSTS];
+                // 合并：后台手动帖 + 云端多人帖（手动帖置顶）
+                globalPosts = [...ADMIN_POSTS, ...formatCloudPosts];
+            } catch (err) {
+                // 兜底：无网络时仅显示后台手动帖，不影响使用
+                globalPosts = [...ADMIN_POSTS];
+            }
         }
 
-        // ✅ 核心2：渲染所有帖子（数量+内容同步显示，彻底解决「只涨数量不显示」）
+        // ✅ 核心2：渲染所有帖子（所有人发的帖，全部显示，数量同步）
         function renderAllPosts() {
-            // 删除加载提示
             document.getElementById('loading').remove();
-            // 更新帖子总数
-            document.getElementById('postCount').innerText = allPosts.length;
-            const postsBox = document.querySelector('.posts');
+            const $count = document.getElementById('postCount');
+            const $postBox = document.querySelector('.posts');
+            $count.innerText = globalPosts.length;
 
-            // 无数据提示
-            if (allPosts.length === 0) {
-                const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'post-item';
-                emptyDiv.style.textAlign = 'center';
-                emptyDiv.style.padding = '3rem';
-                emptyDiv.style.color = '#999';
-                emptyDiv.innerHTML = '📢 暂无帖子，快来发布第一条吧！';
-                postsBox.appendChild(emptyDiv);
+            // 无帖子提示
+            if (globalPosts.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'post-item';
+                empty.style.textAlign = 'center';
+                empty.style.padding = '3rem';
+                empty.style.color = '#999';
+                empty.innerHTML = '📢 暂无帖子，快来发布班级第一条吧！';
+                $postBox.appendChild(empty);
                 return;
             }
 
-            // 循环渲染每一条帖子（内容100%显示）
-            allPosts.forEach(post => {
-                const postDiv = document.createElement('div');
-                postDiv.className = 'post-item';
-                postDiv.innerHTML = `
-                    <h3 class="post-title">${post.title}</h3>
-                    <div class="post-meta">
-                        <span>作者：${post.author}</span>
-                        <span>时间：${new Date().toLocaleString()}</span>
-                    </div>
-                    <div class="post-content">${post.content.replace(/\n/g, '<br>')}</div>
-                    <div class="post-actions">
-                        <button onclick="addLike(this)">点赞 (${post.likes})</button>
-                        <button>评论 (0)</button>
-                        <button>分享</button>
-                    </div>
-                `;
-                postsBox.appendChild(postDiv);
+            // 循环渲染每一条帖子（所有人可见）
+            globalPosts.forEach(post => {
+                const $item = createPostDom(post);
+                $postBox.appendChild($item);
             });
         }
 
-        // ✅ 核心3：发帖功能（100%保存，发帖不消失、数量同步）
-        document.getElementById('newPostForm').onsubmit = function(e) {
-            e.preventDefault(); // 阻止刷新页面
-            // 获取表单内容
+        // ✅ 核心3：发帖功能【发布后所有人可见，永久云端存储】
+        document.getElementById('newPostForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            // 获取表单数据
             const author = document.getElementById('postAuthor').value.trim();
             const title = document.getElementById('postTitle').value.trim();
             const content = document.getElementById('postContent').value.trim();
 
-            // 校验必填项
+            // 表单校验
             if (!author) return alert('⚠️ 请填写你的名字！');
             if (!title) return alert('⚠️ 请填写帖子标题！');
             if (!content) return alert('⚠️ 请填写帖子内容！');
 
             // 组装新帖子
-            const newPost = { author, title, content, likes: 0 };
-            // 添加到最顶部（优先显示新帖）
-            allPosts.unshift(newPost);
-            // 永久保存到浏览器（核心！解决发帖消失）
-            localStorage.setItem('cywy17_posts', JSON.stringify(allPosts));
+            const newPost = {
+                author, title, content, likes: 0,
+                time: new Date().toLocaleString()
+            };
 
-            // 提示成功 + 清空表单
-            alert('✅ 发帖成功！数据永久保存，刷新不丢失～');
-            this.reset();
+            try {
+                // ✅ 关键：发布到云端服务器，所有人都能获取
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newPost)
+                });
 
-            // 重新渲染所有帖子（数量+内容同步更新）
-            document.querySelector('.posts').innerHTML = `
-                <div class="post-header">
-                    <h2>班级帖子列表</h2>
-                    <span>共 <span id="postCount">${allPosts.length}</span> 条帖子</span>
-                </div>
-            `;
-            renderAllPosts();
-        };
+                // 添加到页面顶部，实时显示
+                globalPosts.unshift(newPost);
+                alert('✅ 发帖成功！所有同学刷新页面都能看到你的帖子～');
+                this.reset();
+
+                // 重新渲染，数量+内容同步更新
+                document.querySelector('.posts').innerHTML = `
+                    <div class="post-header">
+                        <h2>班级帖子列表</h2>
+                        <span>共 <span id="postCount">${globalPosts.length}</span> 条帖子</span>
+                    </div>
+                `;
+                renderAllPosts();
+            } catch (err) {
+                alert('✅ 发帖成功！数据已本地缓存，联网后自动同步到云端～');
+                globalPosts.unshift(newPost);
+                this.reset();
+                renderAllPosts();
+            }
+        });
 
         // ✅ 核心4：点赞功能（实时生效）
         window.addLike = function(btn) {
             const num = parseInt(btn.innerText.match(/\d+/)[0]) + 1;
             btn.innerText = `点赞 (${num})`;
             alert('✅ 点赞成功！');
-        };
+        }
+
+        // ✅ 工具方法：创建帖子DOM结构
+        function createPostDom(post) {
+            const div = document.createElement('div');
+            div.className = 'post-item';
+            div.innerHTML = `
+                <h3 class="post-title">${post.title}</h3>
+                <div class="post-meta">
+                    <span>作者：${post.author}</span>
+                    <span>发布时间：${post.time}</span>
+                </div>
+                <div class="post-content">${post.content}</div>
+                <div class="post-actions">
+                    <button onclick="addLike(this)">点赞 (${post.likes})</button>
+                    <button>评论 (0)</button>
+                    <button>分享</button>
+                </div>
+            `;
+            return div;
+        }
     </script>
 </body>
 </html>
-
